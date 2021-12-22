@@ -1,0 +1,151 @@
+package com.app.mytoolbox.fragments.detailRailFragment.adapter;
+
+import android.app.Activity;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+
+import androidx.annotation.NonNull;
+import androidx.databinding.DataBindingUtil;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+
+import com.app.mytoolbox.R;
+import com.app.mytoolbox.adapter.RibbonAdapter;
+import com.app.mytoolbox.beanModel.ksBeanmodel.AssetCommonImages;
+import com.app.mytoolbox.beanModel.ksBeanmodel.RailCommonData;
+import com.app.mytoolbox.callBacks.commonCallBacks.DetailRailClick;
+import com.app.mytoolbox.callBacks.commonCallBacks.MediaTypeCallBack;
+import com.app.mytoolbox.databinding.ExclusiveItemBinding;
+import com.app.mytoolbox.databinding.RelatedItemBinding;
+import com.app.mytoolbox.thirdParty.fcm.FirebaseEventManager;
+import com.app.mytoolbox.utils.commonMethods.AppCommonMethods;
+import com.app.mytoolbox.utils.constants.AppConstants;
+import com.app.mytoolbox.utils.helpers.ActivityLauncher;
+import com.app.mytoolbox.utils.helpers.AssetContent;
+import com.app.mytoolbox.utils.helpers.ImageHelper;
+import com.app.mytoolbox.utils.helpers.NetworkConnectivity;
+import com.app.mytoolbox.utils.helpers.ToastHandler;
+import com.kaltura.client.types.BooleanValue;
+import com.kaltura.client.types.MultilingualStringValueArray;
+import com.kaltura.client.types.Value;
+
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+public class SimilarAdapter extends RecyclerView.Adapter<SimilarAdapter.SingleItemViewHolder> {
+    private List<RailCommonData> similarItemList;
+    private Activity mContext;
+    private DetailRailClick detailRailClick;
+
+
+    public SimilarAdapter(Activity context, List<RailCommonData> loadedList) {
+        similarItemList = loadedList;
+        mContext = context;
+        try {
+            this.detailRailClick = ((DetailRailClick) context);
+        } catch (ClassCastException e) {
+            throw new ClassCastException("Activity must implement AdapterCallback.");
+        }
+    }
+
+    @NonNull
+    @Override
+    public SingleItemViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        RelatedItemBinding landscapeItemBinding = DataBindingUtil.inflate(
+                LayoutInflater.from(parent.getContext()),
+                R.layout.related_item, parent, false);
+        return new SingleItemViewHolder(landscapeItemBinding);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull SingleItemViewHolder holder, int position) {
+        RailCommonData singleItem = similarItemList.get(position);
+        if (singleItem.getImages().size() > 0) {
+            AssetCommonImages assetCommonImages = singleItem.getImages().get(0);
+            ImageHelper.getInstance(holder.landscapeItemBinding.image.getContext()).loadImageToLandscape(holder.landscapeItemBinding.image, assetCommonImages.getImageUrl(), R.drawable.ic_landscape_placeholder);
+
+        } else {
+            ImageHelper.getInstance(holder.landscapeItemBinding.image.getContext()).loadImageToPlaceholder(holder.landscapeItemBinding.image, AppCommonMethods.getImageURI(R.drawable.ic_landscape_placeholder, holder.landscapeItemBinding.image), R.drawable.ic_landscape_placeholder);
+
+        }
+        try {
+            setRecycler(holder.landscapeItemBinding.metas.recyclerView, singleItem.getObject().getTags());
+            AppCommonMethods.setBillingUi(holder.landscapeItemBinding.billingImage, singleItem.getObject().getTags(), singleItem.getObject().getType(), mContext);
+
+        } catch (Exception e) {
+
+        }
+
+        holder.landscapeItemBinding.lanscapeTitle.setText(singleItem.getName());
+
+    }
+
+    private void setRecycler(RecyclerView recyclerView, Map<String, MultilingualStringValueArray> tags) {
+        recyclerView.setLayoutManager(new LinearLayoutManager(mContext, LinearLayoutManager.HORIZONTAL, false));
+        RibbonAdapter ribbonAdapter = new RibbonAdapter(AssetContent.getRibbon(tags));
+        recyclerView.setAdapter(ribbonAdapter);
+
+    }
+
+    @Override
+    public int getItemCount() {
+        return similarItemList.size();
+    }
+
+    private void getPremimumMark(int position, ExclusiveItemBinding exclusiveLayout) {
+
+        exclusiveLayout.exclLay.setVisibility(View.GONE);
+        Map<String, Value> map = similarItemList.get(position).getObject().getMetas();
+
+        Set keys = map.keySet();
+        Iterator itr = keys.iterator();
+
+        String key;
+        while (itr.hasNext()) {
+            key = (String) itr.next();
+            if (key.equalsIgnoreCase("Is Exclusive")) {
+                exclusiveLayout.exclLay.setVisibility(View.VISIBLE);
+                BooleanValue doubleValue = (BooleanValue) map.get(key);
+
+                if (doubleValue.getValue()) {
+                    exclusiveLayout.exclLay.setVisibility(View.VISIBLE);
+                } else {
+                    exclusiveLayout.exclLay.setVisibility(View.GONE);
+                }
+
+            }
+        }
+    }
+
+    class SingleItemViewHolder extends RecyclerView.ViewHolder {
+        RelatedItemBinding landscapeItemBinding;
+
+        public SingleItemViewHolder(@NonNull RelatedItemBinding itemView) {
+            super(itemView.getRoot());
+            landscapeItemBinding = itemView;
+            final String name = mContext.getClass().getSimpleName();
+
+
+            landscapeItemBinding.cardView.setOnClickListener(v -> {
+                new ActivityLauncher(mContext).railClickCondition("", "", name, similarItemList.get(getLayoutPosition()), getLayoutPosition(), AppConstants.Rail5, similarItemList, new MediaTypeCallBack() {
+                    @Override
+                    public void detailItemClicked(String _url, int position, int type, RailCommonData commonData) {
+                        if (NetworkConnectivity.isOnline(mContext)) {
+                            FirebaseEventManager.getFirebaseInstance(mContext).ralatedTabEvent(commonData.getObject().getName(),commonData.getObject(),mContext,"");
+                            detailRailClick.detailItemClicked(_url, position, type, commonData);
+                        } else {
+                            ToastHandler.show(mContext.getResources().getString(R.string.no_internet_connection), mContext);
+                        }
+                    }
+                });
+            });
+
+        }
+
+
+    }
+
+}
